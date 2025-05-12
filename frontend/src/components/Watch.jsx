@@ -1,8 +1,19 @@
 import { useSearchParams } from 'react-router-dom';
+import { useEffect } from 'react';
 
 export default function Watch() {
   const [searchParams] = useSearchParams();
   const videoId = searchParams.get('v');
+
+  useEffect(() => {
+    if (videoId) {
+      fetch('/api/history', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ videoId }),
+      }).catch((err) => console.error("Failed to log video to history:", err));
+    }
+  }, [videoId]);
 
   if (!videoId) {
     return <div className="text-white p-6">Missing video ID.</div>;

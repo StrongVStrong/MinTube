@@ -11,47 +11,102 @@ const Home = () => {
     { youtubeId: "goS8fzIV38A" }
     ];
 
-  const loadVideos = useCallback(() => {
+  const getTimeAgo = (dateString) => {
+    const date = new Date(dateString);
+    const now = new Date();
+    const diff = now - date;
+
+    const seconds = Math.floor(diff / 1000);
+    const minutes = Math.floor(seconds / 60);
+    const hours   = Math.floor(minutes / 60);
+    const days    = Math.floor(hours / 24);
+    const months  = Math.floor(days / 30);
+    const years   = Math.floor(months / 12);
+
+    if (years > 0) return `${years} year${years !== 1 ? 's' : ''} ago`;
+    if (months > 0) return `${months} month${months !== 1 ? 's' : ''} ago`;
+    if (days > 0) return `${days} day${days !== 1 ? 's' : ''} ago`;
+    if (hours > 0) return `${hours} hour${hours !== 1 ? 's' : ''} ago`;
+    if (minutes > 0) return `${minutes} minute${minutes !== 1 ? 's' : ''} ago`;
+    return `Just now`;
+  };
+
+  const loadVideos = useCallback(async () => {
     setLoading(true);
 
-    const newVideoPromises = Array.from({ length: 20 }, async (_, i) => {
-        const index = i + videos.length;
-        const base = videoTemplates[index % videoTemplates.length];
-        const { youtubeId } = base;
+    try {
+      const res = await fetch('/api/recommendations');
+      if (!res.ok) throw new Error('Recommendation fetch failed');
 
+      const data = await res.json();
+      const recs = data.recommendations || [];
+
+      const infoPromises = recs.map(async (rec, i) => {
         try {
-        const res = await fetch(`/api/video-info?id=${youtubeId}`);
-        const data = await res.json();
+          const url = new URL(rec.videoUrl);
+          const id = url.searchParams.get("v");
 
-        return {
-            id: youtubeId,
-            thumbnail: `https://i.ytimg.com/vi/${youtubeId}/mqdefault.jpg`,
-            duration: `${Math.floor(Math.random() * 10) + 1}:${Math.floor(Math.random() * 60)
-            .toString()
-            .padStart(2, "0")}`,
-            ...data
-        };
+          const infoRes = await fetch(`/api/video-info?id=${id}`);
+          const info = await infoRes.json();
+
+          return {
+            id,
+            title: info.title,
+            channel: info.channel,
+            uploaded: getTimeAgo(info.uploaded),
+            views: info.views,
+            channelAvatar: info.channelAvatar,
+            thumbnail: rec.thumbnail,
+            duration: "0:00" // You can update this later if needed
+          };
         } catch (err) {
-        console.error("Failed to fetch video info:", err);
-        return {
-            id: youtubeId,
-            title: "Unavailable",
-            channel: "Unknown",
-            views: "0 views",
-            uploaded: "Unknown",
-            channelAvatar: "https://via.placeholder.com/80",
-            thumbnail: `https://i.ytimg.com/vi/${youtubeId}/mqdefault.jpg`,
-            duration: "0:00"
-        };
+          console.warn(`Failed to fetch video info for ${rec.videoUrl}`, err);
+          return null;
         }
-    });
+      });
 
-    Promise.all(newVideoPromises).then((resolvedVideos) => {
-        setVideos((prev) => [...prev, ...resolvedVideos]);
-        setLoading(false);
-    });
-    }, [videos.length]);
+      const videosWithInfo = (await Promise.all(infoPromises)).filter(v => v !== null);
+      setVideos(prev => [...prev, ...videosWithInfo]);
 
+    } catch (err) {
+      console.warn("Falling back to default video templates:", err);
+
+      const fallbackVideos = await Promise.all(
+        Array.from({ length: 20 }, async (_, i) => {
+          const index = i + videos.length;
+          const base = videoTemplates[index % videoTemplates.length];
+          const { youtubeId } = base;
+
+          try {
+            const res = await fetch(`/api/video-info?id=${youtubeId}`);
+            const data = await res.json();
+
+            return {
+              id: youtubeId,
+              thumbnail: `https://i.ytimg.com/vi/${youtubeId}/mqdefault.jpg`,
+              duration: `${Math.floor(Math.random() * 10) + 1}:${Math.floor(Math.random() * 60).toString().padStart(2, "0")}`,
+              ...data
+            };
+          } catch {
+            return {
+              id: youtubeId,
+              title: "Unavailable",
+              channel: "Unknown",
+              views: "0 views",
+              uploaded: "Unknown",
+              channelAvatar: "https://via.placeholder.com/80",
+              thumbnail: `https://i.ytimg.com/vi/${youtubeId}/mqdefault.jpg`,
+              duration: "0:00"
+            };
+          }
+        })
+      );
+
+      setVideos(prev => [...prev, ...fallbackVideos]);
+    }
+
+    setLoading(false);
+  }, [videos.length]);
 
   useEffect(() => {
     loadVideos();
