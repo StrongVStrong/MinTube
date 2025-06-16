@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Link } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import '../tailwind.css';
 
 const Home = () => {
@@ -31,6 +32,36 @@ const Home = () => {
     return `Just now`;
   };
 
+  const loadCache = useCallback(async () => {
+    try {
+      const cacheRes = await fetch('/api/cached-recommendations');
+      const data = await cacheRes.json();
+      const normalizeUploadedDate = (raw) =>
+        /^\d{8}$/.test(raw)
+          ? `${raw.slice(0, 4)}-${raw.slice(4, 6)}-${raw.slice(6, 8)}`
+          : raw;
+
+      if (Array.isArray(data)) {
+        setVideos(
+          data.map((video) => ({
+            ...video,
+            uploaded: getTimeAgo(normalizeUploadedDate(video.uploaded)),
+          }))
+        );
+      } else if (Array.isArray(data.recommendations)) {
+        setVideos(
+          data.recommendations.map((video) => ({
+            ...video,
+            uploaded: getTimeAgo(normalizeUploadedDate(video.uploaded)),
+          }))
+        );
+      }
+
+    } catch {
+      console.warn('No cached recommendations found');
+    }
+  }, []);
+
   const loadVideos = useCallback(async () => {
     setLoading(true);
 
@@ -53,11 +84,15 @@ const Home = () => {
             id,
             title: info.title,
             channel: info.channel,
-            uploaded: getTimeAgo(info.uploaded),
+            uploaded: getTimeAgo(
+              /^\d{8}$/.test(info.uploaded)
+                ? `${info.uploaded.slice(0, 4)}-${info.uploaded.slice(4, 6)}-${info.uploaded.slice(6, 8)}`
+                : info.uploaded
+            ),
             views: info.views,
             channelAvatar: info.channelAvatar,
             thumbnail: rec.thumbnail,
-            duration: "0:00" // You can update this later if needed
+            duration: info.duration || rec.duration || "0:00"
           };
         } catch (err) {
           console.warn(`Failed to fetch video info for ${rec.videoUrl}`, err);
@@ -109,8 +144,13 @@ const Home = () => {
   }, [videos.length]);
 
   useEffect(() => {
-    loadVideos();
-  }, []);
+  loadCache().then(() => {
+    // Give the UI a moment to show cached content
+    setTimeout(() => {
+      loadVideos();
+    }, 100); // slight delay is enough
+  });
+}, []);
 
   useEffect(() => {
     const handleScroll = () => {
@@ -125,6 +165,16 @@ const Home = () => {
     window.addEventListener('scroll', handleScroll);
     return () => window.removeEventListener('scroll', handleScroll);
   }, [loading, loadVideos]);
+
+  const [searchQuery, setSearchQuery] = useState('');
+  const navigate = useNavigate();
+
+  const handleSearch = (e) => {
+    e.preventDefault();
+    if (searchQuery.trim()) {
+      navigate(`/search?q=${encodeURIComponent(searchQuery.trim())}`);
+    }
+  };
 
   return (
     <div className="bg-black min-h-screen w-full overflow-x-hidden flex">
@@ -152,6 +202,11 @@ const Home = () => {
         {/* Header */}
         <header className="fixed top-0 left-0 right-0 bg-black z-10 flex items-center justify-between p-4 border-b border-gray-800">
           <div className="flex items-center">
+            <button className="md:hidden">
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+              </svg>
+            </button>
             <div className="text-red-600 font-bold text-2xl mr-4">
                 <a 
                     href="/"
@@ -160,35 +215,26 @@ const Home = () => {
                     MinTube
                 </a>
             </div>
-            <button className="md:hidden">
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
-              </svg>
-            </button>
           </div>
           
-          <div className="flex-1 max-w-2xl mx-4">
+          <form onSubmit={handleSearch} className="flex-1 max-w-2xl mx-4">
             <div className="relative">
-              <input 
-                type="text" 
-                placeholder="Search" 
+              <input
+                type="text"
+                placeholder="Search"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
                 className="w-full bg-gray-900 text-white px-4 py-2 rounded-full border border-gray-700 focus:outline-none focus:border-blue-500"
               />
-              <button className="absolute right-0 top-0 h-full px-4 text-gray-400 hover:text-white">
+              <button type="submit" className="absolute right-0 top-0 h-full px-4 text-gray-400 hover:text-white">
                 <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
                 </svg>
               </button>
             </div>
-          </div>
+          </form>
           
           <div className="flex items-center space-x-4">
-            <button className="text-white">
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
-              </svg>
-            </button>
-            <div className="w-8 h-8 rounded-full bg-gray-600"></div>
           </div>
         </header>
 
