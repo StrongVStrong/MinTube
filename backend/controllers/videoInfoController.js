@@ -50,19 +50,6 @@ export const getVideoInfo = async (req, res) => {
 
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
 import { exec } from 'child_process';
 
 export const getVideoInfo = async (req, res) => {
@@ -86,8 +73,8 @@ export const getVideoInfo = async (req, res) => {
         channel: data.channel,
         uploaded: data.upload_date,
         views: `${Number(data.view_count).toLocaleString()} views`,
-        channelAvatar: data.channel_favicon || null, // fallback if missing
-        duration: data.duration_string || data.duration, // may vary
+        channelAvatar: data.channel_favicon || null,
+        duration: data.duration_string || data.duration,
         thumbnail: data.thumbnail,
         description: data.description,
         tags: data.tags,

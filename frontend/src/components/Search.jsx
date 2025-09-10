@@ -4,12 +4,10 @@ import Sidebar from '../components/Sidebar';
 import Header from '../components/Header';
 
 function formatDuration(value) {
-  // If it's already in a "m:ss" or "mm:ss" format, return as-is
   if (typeof value === 'string' && /^\d{1,2}:\d{2}$/.test(value)) {
     return value;
   }
 
-  // Try to convert to number of seconds
   const seconds = Number(value);
   if (isNaN(seconds)) return "0:00";
 
@@ -31,7 +29,7 @@ export default function Search() {
     fetch(`/api/search?query=${encodeURIComponent(query)}`)
       .then(res => res.json())
       .then(data => {
-      console.log("Search results:", data);  // 👈 Add this line
+      console.log("Search results:", data);
       setResults(data);
     })
       .catch(console.error)

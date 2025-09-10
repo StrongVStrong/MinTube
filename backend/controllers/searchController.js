@@ -26,6 +26,8 @@ const searchVideos = async (req, res) => {
 
 export { searchVideos };
 */
+
+
 import { exec } from 'child_process';
 import util from 'util';
 
@@ -37,7 +39,7 @@ export const searchVideos = async (req, res) => {
 
   try {
     const { stdout } = await execAsync(`yt-dlp -j "ytsearch5:${query}"`, {
-      maxBuffer: 10 * 1024 * 1024, // fix for large output
+      maxBuffer: 10 * 1024 * 1024,
     });
 
     const lines = stdout.trim().split('\n');
